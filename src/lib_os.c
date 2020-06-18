@@ -31,91 +31,6 @@
 
 #define LJLIB_MODULE_os
 
-LJLIB_CF(os_execute)
-{
-#if LJ_TARGET_CONSOLE
-#if LJ_52
-  errno = ENOSYS;
-  return luaL_fileresult(L, 0, NULL);
-#else
-  lua_pushinteger(L, -1);
-  return 1;
-#endif
-#else
-  const char *cmd = luaL_optstring(L, 1, NULL);
-  int stat = system(cmd);
-#if LJ_52
-  if (cmd)
-    return luaL_execresult(L, stat);
-  setboolV(L->top++, 1);
-#else
-  setintV(L->top++, stat);
-#endif
-  return 1;
-#endif
-}
-
-LJLIB_CF(os_remove)
-{
-  const char *filename = luaL_checkstring(L, 1);
-  return luaL_fileresult(L, remove(filename) == 0, filename);
-}
-
-LJLIB_CF(os_rename)
-{
-  const char *fromname = luaL_checkstring(L, 1);
-  const char *toname = luaL_checkstring(L, 2);
-  return luaL_fileresult(L, rename(fromname, toname) == 0, fromname);
-}
-
-LJLIB_CF(os_tmpname)
-{
-#if LJ_TARGET_PS3 || LJ_TARGET_PS4
-  lj_err_caller(L, LJ_ERR_OSUNIQF);
-  return 0;
-#else
-#if LJ_TARGET_POSIX
-  char buf[15+1];
-  int fp;
-  strcpy(buf, "/tmp/lua_XXXXXX");
-  fp = mkstemp(buf);
-  if (fp != -1)
-    close(fp);
-  else
-    lj_err_caller(L, LJ_ERR_OSUNIQF);
-#else
-  char buf[L_tmpnam];
-  if (tmpnam(buf) == NULL)
-    lj_err_caller(L, LJ_ERR_OSUNIQF);
-#endif
-  lua_pushstring(L, buf);
-  return 1;
-#endif
-}
-
-LJLIB_CF(os_getenv)
-{
-#if LJ_TARGET_CONSOLE
-  lua_pushnil(L);
-#else
-  lua_pushstring(L, getenv(luaL_checkstring(L, 1)));  /* if NULL push nil */
-#endif
-  return 1;
-}
-
-LJLIB_CF(os_exit)
-{
-  int status;
-  if (L->base < L->top && tvisbool(L->base))
-    status = boolV(L->base) ? EXIT_SUCCESS : EXIT_FAILURE;
-  else
-    status = lj_lib_optint(L, 1, EXIT_SUCCESS);
-  if (L->base+1 < L->top && tvistruecond(L->base+1))
-    lua_close(L);
-  exit(status);
-  return 0;  /* Unreachable. */
-}
-
 LJLIB_CF(os_clock)
 {
   setnumV(L->top++, ((lua_Number)clock())*(1.0/(lua_Number)CLOCKS_PER_SEC));
@@ -247,24 +162,6 @@ LJLIB_CF(os_difftime)
 {
   lua_pushnumber(L, difftime((time_t)(luaL_checknumber(L, 1)),
 			     (time_t)(luaL_optnumber(L, 2, (lua_Number)0))));
-  return 1;
-}
-
-/* ------------------------------------------------------------------------ */
-
-LJLIB_CF(os_setlocale)
-{
-  GCstr *s = lj_lib_optstr(L, 1);
-  const char *str = s ? strdata(s) : NULL;
-  int opt = lj_lib_checkopt(L, 2, 6,
-    "\5ctype\7numeric\4time\7collate\10monetary\1\377\3all");
-  if (opt == 0) opt = LC_CTYPE;
-  else if (opt == 1) opt = LC_NUMERIC;
-  else if (opt == 2) opt = LC_TIME;
-  else if (opt == 3) opt = LC_COLLATE;
-  else if (opt == 4) opt = LC_MONETARY;
-  else if (opt == 6) opt = LC_ALL;
-  lua_pushstring(L, setlocale(opt, str));
   return 1;
 }
 
